@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Приложение, выводящее X-Forwarded-For
+  app:
+    build: ./app
+    container_name: app
+    networks:
+      - proxy-net
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  # Nginx 1 - точка входа для тестов
+  nginx1:
+    image: nginx:alpine
+    container_name: nginx1
+    volumes:
+      - ./nginx1/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8081:80"
+    networks:
+      proxy-net:
+        # Фиксированный IP для идентификации в логах
+        ipv4_address: 172.25.0.10
+    depends_on:
+      - nginx2
+      - nginx3
+      - app
+    restart: unless-stopped
+
+  # Nginx 2 - промежуточный прокси
+  nginx2:
+    image: nginx:alpine
+    container_name: nginx2
+    volumes:
+      - ./nginx2/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      proxy-net:
+        ipv4_address: 172.25.0.20
+    depends_on:
+      - nginx3
+    restart: unless-stopped
+
+  # Nginx 3 - последний прокси перед приложением
+  nginx3:
+    image: nginx:alpine
+    container_name: nginx3
+    volumes:
+      - ./nginx3/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      proxy-net:
+        ipv4_address: 172.25.0.30
+    depends_on:
+      - app
+    restart: unless-stopped
+
+networks:
+  proxy-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
